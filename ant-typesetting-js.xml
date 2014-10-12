@@ -1,0 +1,283 @@
+<project>
+    <!-- Default properties -->
+    <property name="ant-typesetting.typeset.cache" value="false" />
+
+    <!-- Typesets a latex document -->
+    <scriptdef name="typeset" language="javascript">
+        <attribute name="document" />
+        <attribute name="documentclass" />
+        <attribute name="documentattributes" />
+        <attribute name="basedir" />
+        <attribute name="inputpathref" />
+        <attribute name="outputname" />
+        <attribute name="outputdir" />
+        <attribute name="cache" />
+        <attribute name="cachedir" />
+        <attribute name="locale" />
+        <attribute name="draft" />
+        <attribute name="verbose" />
+        <attribute name="documentcompiler" />
+        <attribute name="externalizecompiler" />
+        
+        <![CDATA[
+            // Line 18
+
+            // Extensions
+            String.prototype.trim = function() {
+                return String(this).replace(/^\s+|\s+$/g, "");
+            };
+
+            String.prototype.toBoolean = function() {
+                return String(this).equalsIgnoreCase("true");
+            }
+
+            // Helper functions
+            var getOptionalAttribute = function(name, default_value) {
+                var value = attributes.get(name);
+
+                if (value == null) {
+                    value = default_value;
+                }
+
+                return value;
+            };
+
+            var parseLog = function(log) {
+                var messages = [];
+                var logs = log.replace("\r\n", "\n").split("\n");
+
+                for (i = 0; i < logs.length; i++) {
+                    var line = logs[i];
+
+                    // Capture error
+                    if (line.startsWith("!")) {
+                        // Concat error in current and subsequent line
+                        var errorMessage = java.lang.String.format("%1$s %2$s", line.substring(2), logs[i + 1]);
+
+                        // Skip subsequent line
+                        i += 1;
+
+                        // Append error
+                        messages.push("Error: " +  errorMessage);
+                    }
+                    // Capture warning
+                    else if (line.startsWith("LaTeX Warning")) {
+                        var warningMessage = line.substring(15);
+
+                        // Append warning
+                        messages.push("Warning: " + warningMessage);
+                    }
+                }
+                
+                return messages;
+            };
+            
+            var displayLog = function(messages) {
+                // Display errors and warnings
+                messages.forEach(function(message) {
+                    self.log(message);
+                });
+            };
+
+            // Fetch attributes
+            var document = new java.io.File(attributes.get("document"));
+            var documentclass = attributes.get("documentclass");
+
+            if (documentclass == null || documentclass.isEmpty()) {
+                throw org.apache.tools.ant.BuildException("Task typeset requires the \"documentclass\" attribute.");
+            }
+
+            var documentattributes = getOptionalAttribute("documentattributes", null);
+
+            var basedir = attributes.get("basedir");
+
+            if (basedir != null) {
+                basedir = new java.io.File(basedir);
+            }
+            else {
+                // Use project base dir
+                basedir = project.getBaseDir();
+            }
+
+            var inputpathref = attributes.get("inputpathref");
+
+            if (inputpathref != null) {
+                inputpathref = new org.apache.tools.ant.types.Reference(inputpathref);
+                var inputpath = new org.apache.tools.ant.types.Path(project);
+                inputpath.setRefid(inputpathref);
+            }
+            else {
+                var inputpath = null;
+            }
+
+            var outputname = attributes.get("outputname");
+
+            var outputdir = attributes.get("outputdir");
+
+            if (outputdir != null) {
+                outputdir = new java.io.File(outputdir);
+            }
+
+            var cache = getOptionalAttribute("cache", "false").toBoolean();
+
+            var cachedir = attributes.get("cachedir");
+
+            if (cachedir != null) {
+                cachedir = new java.io.File(cachedir);
+            }
+
+            var locale = attributes.get("locale");
+
+            var draft = getOptionalAttribute("draft", "false").toBoolean();
+
+            var verbose = getOptionalAttribute("verbose", "false").toBoolean();
+            
+            var documentcompiler = getOptionalAttribute("documentcompiler", "lualatex");
+            
+            var externalizecompiler = getOptionalAttribute("externalizecompiler", "lualatex");
+
+            // Create buffer for preamble
+            var preamble = new java.lang.StringBuilder();
+
+            // Determine input document
+            var basePath = java.nio.file.Paths.get(basedir.getAbsolutePath());
+            var documentPath = java.nio.file.Paths.get(document.getParent());
+            var relativeDocumentPath = basePath.relativize(documentPath);
+            
+            var documentName = document.getName();
+            var documentWithoutExt = documentName.substring(0, documentName.lastIndexOf("."));
+            var documentSeparator = relativeDocumentPath.toString().isEmpty() ? "" : "/";
+
+            var inputDocument = java.lang.String.format("%1$s%3$s%2$s", relativeDocumentPath.toString().replaceAll("\\\\", "/"), documentWithoutExt, documentSeparator);
+
+            // Document class and attributes
+            if (documentattributes != null) {
+                // Document class with attributes
+                var preambledocumentclass = java.lang.String.format("\\documentclass[%2$s]{%1$s}", documentclass, documentattributes);
+            }
+            else {
+                // Document class without attributes
+                var preambledocumentclass = java.lang.String.format("\\documentclass{%1$s}", documentclass);
+            }
+
+            // Add document class to preamble
+            preamble.append(preambledocumentclass);
+
+            // Overwrite the documentclass in the document
+            preamble.append("\\renewcommand\\documentclass[2][]{}");
+
+            // Ensure compatibility with TikZ externalize feature
+            if (cache) {
+                // Insert PGF/TikZ code into preamble
+                preamble.append("\\usepackage{tikz}");
+                preamble.append("\\usetikzlibrary{external}");
+                
+                // Insert placeholder for system call definition
+                preamble.append("\\tikzsetsystemcall");
+            }
+            
+            // Determine relative cache path (external prefix)
+            var externalPrefix = "";
+
+            if (cachedir != null) {
+                var cachePath = java.nio.file.Paths.get(cachedir.getPath());
+                var relativeCachePath = basePath.relativize(cachePath);
+                externalPrefix = relativeCachePath.toString().replaceAll("\\\\", "/");
+                
+                // Ensure that the external prefix ends with a trailing slash
+                if (!externalPrefix.endsWith("/")) {
+                    externalPrefix = externalPrefix.concat("/");
+                }
+            }
+            
+            // Define tikz cache dir
+            if (cache && cachedir != null) {
+                preamble.append(java.lang.String.format("\\tikzsetexternalprefix{%1$s}", externalPrefix));
+            }
+
+            // Locale
+            if (locale != null) {
+                preamble.append(java.lang.String.format("\\newcommand\\locale{%1$s}", locale));
+            }
+
+            // Set input document
+            preamble.append(java.lang.String.format("\\input{%1$s}", inputDocument));
+
+            // Set TikZ externalize system call
+            if (cache) {
+                var filteredPreamble = preamble.toString().replace("\\tikzsetsystemcall", "");
+                var tikzSetSystemCall = java.lang.String.format("\\tikzset{external/system call={%3$s \\tikzexternalcheckshellescape -halt-on-error -interaction=batchmode -jobname \"\\image\" \"\\string\\def\\string\\tikzexternalrealjob{%1$s}%2$s\"}}", inputDocument, filteredPreamble.replace("\\", "\\string\\"), externalizecompiler);
+                
+                preamble = new java.lang.StringBuilder(preamble.toString().replace("\\tikzsetsystemcall", tikzSetSystemCall));
+            }
+
+            // Job name
+            if (outputname != null) {
+                // Use the defined output name as job name
+                var jobname = outputname;
+            }
+            else {
+                // Use the document name as job name
+                var jobname = documentWithoutExt;
+            }
+
+            // Create execution task
+            var exec = project.createTask("exec");
+            exec.setExecutable(documentcompiler);
+        
+            if (!verbose) {
+                // Capture output and error stream of the document compiler
+                exec.setOutputproperty(java.lang.String.format("%1$s.out", "typeset"));
+                exec.setErrorProperty(java.lang.String.format("%1$s.err", "typeset"));
+            }
+
+            var texPreamble = preamble.toString();
+            exec.setInputString(texPreamble);
+
+            // Set working directory
+            if (basedir != null) {
+                exec.setDir(basedir);
+            }
+
+            // Append arguments
+            exec.createArg().setValue("-shell-escape");
+            exec.createArg().setValue("-interaction=nonstopmode");
+            exec.createArg().setValue(java.lang.String.format("-jobname=%1$s", jobname));
+        
+            if (outputdir != null) {
+                exec.createArg().setValue(java.lang.String.format("-output-directory=%1$s", outputdir));
+            }
+
+            if (draft) {
+                exec.createArg().setValue("-draftmode");
+            }
+
+            // Append environment variables
+            if (inputpath != null) {
+                // Determine complete input path path (prepend base path and append default texinputs)
+                var texinputs = java.lang.String.format("%1$s%2$s", inputpath.toString(), java.io.File.pathSeparator);
+                
+                // Create environment variable
+                var texinputvar = new org.apache.tools.ant.types.Environment.Variable();
+                texinputvar.setKey("TEXINPUTS");
+                texinputvar.setValue(texinputs);
+                
+                exec.addEnv(texinputvar);
+            }
+
+            // Execute tex compiler
+            exec.perform();
+
+            if (!verbose) {
+                // Get output and error stream
+                var out = project.getProperty(java.lang.String.format("%1$s.out", "typeset"));
+
+                // Parse errors and warnings
+                var messages = parseLog(out);
+
+                // Display errors and warnings
+                displayLog(messages);
+            }
+        ]]>
+    </scriptdef>
+</project>

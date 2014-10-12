@@ -1,0 +1,39 @@
+<project name="ant-typesetting-js" default="test" basedir=".">
+    <description>Build and test definition of ant-typesetting-js library.</description>
+
+    <!-- Paths -->
+    <property name="build.folder" location="${basedir}/build" />
+    <property name="cache.folder" location="${basedir}/cache" />
+    <property name="documents.folder" location="${basedir}/documents" />
+    <property name="images.folder" location="${basedir}/images" />
+
+    <path id="resources.inputpath">
+        <pathelement location="${documents.folder}" />
+        <pathelement location="${images.folder}" />
+    </path>
+
+    <property name="document.test" location="${documents.folder}/test.tex" />
+
+    <!-- ant-typesetting-js library -->
+    <import file="${basedir}/ant-typesetting-js.xml" />
+
+    <target name="init">
+        
+    </target>
+
+    <target name="init-test" depends="init">
+        <!-- Create the build directory -->
+        <mkdir dir="${build.folder}"/>
+
+        <!-- Create the cache directory -->
+        <mkdir dir="${cache.folder}"/>
+    </target>
+
+    <target name="test" depends="init-test" description="">
+        <typeset document="${document.test}" documentclass="article" documentattributes="12pt" inputpathref="resources.inputpath" cache="true" cachedir="${cache.folder}" outputdir="${build.folder}" outputname="test-document" documentcompiler="lualatex" externalizecompiler="lualatex" verbose="false" />
+    </target>
+
+    <target name="dist" depends="init" description="">
+        <!-- TODO Create distribution of ant-typesetting-js.xml -->
+    </target>
+</project>
