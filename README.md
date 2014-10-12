@@ -47,7 +47,7 @@ Parameter | Description | Required | Default
 *documentclass* | Specifies the document class which replaces the document class given in the first line of the TeX document. This replacement is useful, e.g. if you need to compile the same TeX source against multiple document classes. The task always overrides the document class of document such that this parameter is mandatory. | Yes |
 *documentattributes* | Provides a list of attributes which is passed to the document class. | No | ""
 *basedir* | Specifies the directory in which the TeX compiler is executed. | No | ${basedir}
-*inputpathref* | References a path-like structure which is used as *TEXINPUTS* during the TeX run. This feature is like a class path, but for TeX. Usually, this helps to keep images, tables, figures, etc. in separate directories in your project folder. | No | 
+*inputpathref* | References a [path-like structure](http://ant.apache.org/manual/using.html#path) which is used as *TEXINPUTS* during the TeX run. This feature is like a class path, but for TeX. Usually, this helps to keep images, tables, figures, etc. in separate directories in your project folder. | No | 
 *outputname*  | Defines the name of the output document, which corresponds to the `-jobname` parameter of the TeX compiler. By default, the name of the TeX document is used.  | No | 
 *outputdir*  | Specifies the directory which the TeX compiler uses for its output. | No | 
 *cache* | If true, the externalize functionality provided by the PGF/TikZ package is enabled. If you intend to use this feature enable set this attribute *true* ensure compatibility. Otherwise, externalizing PGF or TikZ pictures will fail. | No | false
